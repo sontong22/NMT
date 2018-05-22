@@ -134,21 +134,21 @@ def add_arguments(parser):
                             "between [-this, this]."))
 
   # data
-  parser.add_argument("--src", type=str, default=None,
+  parser.add_argument("--src", type=str, default="vi",
                       help="Source suffix, e.g., en.")
-  parser.add_argument("--tgt", type=str, default=None,
+  parser.add_argument("--tgt", type=str, default="en",
                       help="Target suffix, e.g., de.")
-  parser.add_argument("--train_prefix", type=str, default=None,
+  parser.add_argument("--train_prefix", type=str, default="/tmp/nmt_data/train",
                       help="Train prefix, expect files with src/tgt suffixes.")
-  parser.add_argument("--dev_prefix", type=str, default=None,
+  parser.add_argument("--dev_prefix", type=str, default="/tmp/nmt_data/tst2012",
                       help="Dev prefix, expect files with src/tgt suffixes.")
-  parser.add_argument("--test_prefix", type=str, default=None,
+  parser.add_argument("--test_prefix", type=str, default="/tmp/nmt_data/tst2013",
                       help="Test prefix, expect files with src/tgt suffixes.")
-  parser.add_argument("--out_dir", type=str, default=None,
+  parser.add_argument("--out_dir", type=str, default="/tmp/nmt_model",
                       help="Store log/model files.")
 
   # Vocab
-  parser.add_argument("--vocab_prefix", type=str, default=None, help="""\
+  parser.add_argument("--vocab_prefix", type=str, default="/tmp/nmt_data/vocab", help="""\
       Vocab prefix, expect files with src/tgt suffixes.\
       """)
   parser.add_argument("--embed_prefix", type=str, default=None, help="""\
@@ -287,149 +287,101 @@ def add_arguments(parser):
                       help="number of intra_op_parallelism_threads")
 
 
-def create_hparams(flags):
+def create_hparams():
   """Create training hparams."""
   return tf.contrib.training.HParams(
       # Data
-      src=flags.src,
-      tgt=flags.tgt,
-      train_prefix=flags.train_prefix,
-      dev_prefix=flags.dev_prefix,
-      test_prefix=flags.test_prefix,
-      vocab_prefix=flags.vocab_prefix,
-      embed_prefix=flags.embed_prefix,
-      out_dir=flags.out_dir,
+      src="vi",
+      tgt="en",
+      train_prefix="/tmp/nmt_data/train",
+      dev_prefix="/tmp/nmt_data/tst2012",
+      test_prefix="/tmp/nmt_data/tst2013",
+      vocab_prefix="/tmp/nmt_data/vocab",
+      embed_prefix=None,
+      out_dir="/tmp/nmt_model",
 
       # Networks
-      num_units=flags.num_units,
-      num_layers=flags.num_layers,  # Compatible
-      num_encoder_layers=(flags.num_encoder_layers or flags.num_layers),
-      num_decoder_layers=(flags.num_decoder_layers or flags.num_layers),
-      dropout=flags.dropout,
-      unit_type=flags.unit_type,
-      encoder_type=flags.encoder_type,
-      residual=flags.residual,
-      time_major=flags.time_major,
-      num_embeddings_partitions=flags.num_embeddings_partitions,
+      num_units=32,
+      num_layers=2,  # Compatible
+      num_encoder_layers=2,
+      num_decoder_layers=2,
+      dropout=0.2,
+      unit_type="lstm",
+      encoder_type="uni",
+      residual=False,
+      time_major=True,
+      num_embeddings_partitions=0,
 
       # Attention mechanisms
-      attention=flags.attention,
-      attention_architecture=flags.attention_architecture,
-      output_attention=flags.output_attention,
-      pass_hidden_state=flags.pass_hidden_state,
+      attention="",
+      attention_architecture="standard",
+      output_attention=True,
+      pass_hidden_state=True,
 
       # Train
-      optimizer=flags.optimizer,
-      num_train_steps=flags.num_train_steps,
-      batch_size=flags.batch_size,
-      init_op=flags.init_op,
-      init_weight=flags.init_weight,
-      max_gradient_norm=flags.max_gradient_norm,
-      learning_rate=flags.learning_rate,
-      warmup_steps=flags.warmup_steps,
-      warmup_scheme=flags.warmup_scheme,
-      decay_scheme=flags.decay_scheme,
-      colocate_gradients_with_ops=flags.colocate_gradients_with_ops,
+      optimizer="sgd",
+      num_train_steps=12000,
+      batch_size=128,
+      init_op="uniform",
+      init_weight=0.1,
+      max_gradient_norm=5.0,
+      learning_rate=1.0,
+      warmup_steps=0,
+      warmup_scheme="t2t",
+      decay_scheme="",
+      colocate_gradients_with_ops=True,
 
       # Data constraints
-      num_buckets=flags.num_buckets,
-      max_train=flags.max_train,
-      src_max_len=flags.src_max_len,
-      tgt_max_len=flags.tgt_max_len,
+      num_buckets=5,
+      max_train=0,
+      src_max_len=50,
+      tgt_max_len=50,
 
       # Inference
-      src_max_len_infer=flags.src_max_len_infer,
-      tgt_max_len_infer=flags.tgt_max_len_infer,
-      infer_batch_size=flags.infer_batch_size,
-      beam_width=flags.beam_width,
-      length_penalty_weight=flags.length_penalty_weight,
-      sampling_temperature=flags.sampling_temperature,
-      num_translations_per_input=flags.num_translations_per_input,
+      src_max_len_infer=None,
+      tgt_max_len_infer=None,
+      infer_batch_size=32,
+      beam_width=0,
+      length_penalty_weight=0.0,
+      sampling_temperature=0.0,
+      num_translations_per_input=1,
 
       # Vocab
-      sos=flags.sos if flags.sos else vocab_utils.SOS,
-      eos=flags.eos if flags.eos else vocab_utils.EOS,
-      subword_option=flags.subword_option,
-      check_special_token=flags.check_special_token,
+      sos="<s>",
+      eos="</s>",
+      subword_option="",
+      check_special_token=True,
 
       # Misc
-      forget_bias=flags.forget_bias,
-      num_gpus=flags.num_gpus,
+      forget_bias=1.0,
+      num_gpus=1,
       epoch_step=0,  # record where we were within an epoch.
-      steps_per_stats=flags.steps_per_stats,
-      steps_per_external_eval=flags.steps_per_external_eval,
-      share_vocab=flags.share_vocab,
-      metrics=flags.metrics.split(","),
-      log_device_placement=flags.log_device_placement,
-      random_seed=flags.random_seed,
-      override_loaded_hparams=flags.override_loaded_hparams,
-      num_keep_ckpts=flags.num_keep_ckpts,
-      avg_ckpts=flags.avg_ckpts,
-      num_intra_threads=flags.num_intra_threads,
-      num_inter_threads=flags.num_inter_threads,
+      steps_per_stats=100,
+      steps_per_external_eval=None,
+      share_vocab=False,
+      metrics="bleu",
+      log_device_placement=False,
+      random_seed=None,
+      override_loaded_hparams=False,
+      num_keep_ckpts=5,
+      avg_ckpts=False,
+      num_intra_threads=0,
+      num_inter_threads=0,
   )
 
 
 def extend_hparams(hparams):
   """Extend training hparams."""
-  assert hparams.num_encoder_layers and hparams.num_decoder_layers
-  if hparams.num_encoder_layers != hparams.num_decoder_layers:
-    hparams.pass_hidden_state = False
-    utils.print_out("Num encoder layer %d is different from num decoder layer"
-                    " %d, so set pass_hidden_state to False" % (
-                        hparams.num_encoder_layers,
-                        hparams.num_decoder_layers))
-
-  # Sanity checks
-  if hparams.encoder_type == "bi" and hparams.num_encoder_layers % 2 != 0:
-    raise ValueError("For bi, num_encoder_layers %d should be even" %
-                     hparams.num_encoder_layers)
-  if (hparams.attention_architecture in ["gnmt"] and
-      hparams.num_encoder_layers < 2):
-    raise ValueError("For gnmt attention architecture, "
-                     "num_encoder_layers %d should be >= 2" %
-                     hparams.num_encoder_layers)
 
   # Set residual layers
   num_encoder_residual_layers = 0
   num_decoder_residual_layers = 0
-  if hparams.residual:
-    if hparams.num_encoder_layers > 1:
-      num_encoder_residual_layers = hparams.num_encoder_layers - 1
-    if hparams.num_decoder_layers > 1:
-      num_decoder_residual_layers = hparams.num_decoder_layers - 1
-
-    if hparams.encoder_type == "gnmt":
-      # The first unidirectional layer (after the bi-directional layer) in
-      # the GNMT encoder can't have residual connection due to the input is
-      # the concatenation of fw_cell and bw_cell's outputs.
-      num_encoder_residual_layers = hparams.num_encoder_layers - 2
-
-      # Compatible for GNMT models
-      if hparams.num_encoder_layers == hparams.num_decoder_layers:
-        num_decoder_residual_layers = num_encoder_residual_layers
   hparams.add_hparam("num_encoder_residual_layers", num_encoder_residual_layers)
   hparams.add_hparam("num_decoder_residual_layers", num_decoder_residual_layers)
 
-  if hparams.subword_option and hparams.subword_option not in ["spm", "bpe"]:
-    raise ValueError("subword option must be either spm, or bpe")
-
-  # Flags
-  utils.print_out("# hparams:")
-  utils.print_out("  src=%s" % hparams.src)
-  utils.print_out("  tgt=%s" % hparams.tgt)
-  utils.print_out("  train_prefix=%s" % hparams.train_prefix)
-  utils.print_out("  dev_prefix=%s" % hparams.dev_prefix)
-  utils.print_out("  test_prefix=%s" % hparams.test_prefix)
-  utils.print_out("  out_dir=%s" % hparams.out_dir)
-
-  ## Vocab
-  # Get vocab file names first
-  if hparams.vocab_prefix:
-    src_vocab_file = hparams.vocab_prefix + "." + hparams.src
-    tgt_vocab_file = hparams.vocab_prefix + "." + hparams.tgt
-  else:
-    raise ValueError("hparams.vocab_prefix must be provided.")
+  # Vocab
+  src_vocab_file = hparams.vocab_prefix + "." + hparams.src
+  tgt_vocab_file = hparams.vocab_prefix + "." + hparams.tgt
 
   # Source vocab
   src_vocab_size, src_vocab_file = vocab_utils.check_vocab(
@@ -441,12 +393,7 @@ def extend_hparams(hparams):
       unk=vocab_utils.UNK)
 
   # Target vocab
-  if hparams.share_vocab:
-    utils.print_out("  using source vocab for target")
-    tgt_vocab_file = src_vocab_file
-    tgt_vocab_size = src_vocab_size
-  else:
-    tgt_vocab_size, tgt_vocab_file = vocab_utils.check_vocab(
+  tgt_vocab_size, tgt_vocab_file = vocab_utils.check_vocab(
         tgt_vocab_file,
         hparams.out_dir,
         check_special_token=hparams.check_special_token,
@@ -461,20 +408,6 @@ def extend_hparams(hparams):
   # Pretrained Embeddings:
   hparams.add_hparam("src_embed_file", "")
   hparams.add_hparam("tgt_embed_file", "")
-  if hparams.embed_prefix:
-    src_embed_file = hparams.embed_prefix + "." + hparams.src
-    tgt_embed_file = hparams.embed_prefix + "." + hparams.tgt
-
-    if tf.gfile.Exists(src_embed_file):
-      hparams.src_embed_file = src_embed_file
-
-    if tf.gfile.Exists(tgt_embed_file):
-      hparams.tgt_embed_file = tgt_embed_file
-
-  # Check out_dir
-  if not tf.gfile.Exists(hparams.out_dir):
-    utils.print_out("# Creating output directory %s ..." % hparams.out_dir)
-    tf.gfile.MakeDirs(hparams.out_dir)
 
   # Evaluation
   for metric in hparams.metrics:
@@ -482,12 +415,6 @@ def extend_hparams(hparams):
     best_metric_dir = os.path.join(hparams.out_dir, "best_" + metric)
     hparams.add_hparam("best_" + metric + "_dir", best_metric_dir)
     tf.gfile.MakeDirs(best_metric_dir)
-
-    if hparams.avg_ckpts:
-      hparams.add_hparam("avg_best_" + metric, 0)  # larger is better
-      best_metric_dir = os.path.join(hparams.out_dir, "avg_best_" + metric)
-      hparams.add_hparam("avg_best_" + metric + "_dir", best_metric_dir)
-      tf.gfile.MakeDirs(best_metric_dir)
 
   return hparams
 
@@ -505,19 +432,11 @@ def ensure_compatible_hparams(hparams, default_hparams, hparams_path):
     if key not in config:
       hparams.add_hparam(key, default_config[key])
 
-  # Update all hparams' keys if override_loaded_hparams=True
-  if default_hparams.override_loaded_hparams:
-    for key in default_config:
-      if getattr(hparams, key) != default_config[key]:
-        utils.print_out("# Updating hparams.%s: %s -> %s" %
-                        (key, str(getattr(hparams, key)),
-                         str(default_config[key])))
-        setattr(hparams, key, default_config[key])
   return hparams
 
 
 def create_or_load_hparams(
-    out_dir, default_hparams, hparams_path, save_hparams=True):
+    out_dir, default_hparams, hparams_path):
   """Create hparams or load hparams from out_dir."""
   hparams = utils.load_hparams(out_dir)
   if not hparams:
@@ -529,10 +448,9 @@ def create_or_load_hparams(
     hparams = ensure_compatible_hparams(hparams, default_hparams, hparams_path)
 
   # Save HParams
-  if save_hparams:
-    utils.save_hparams(out_dir, hparams)
-    for metric in hparams.metrics:
-      utils.save_hparams(getattr(hparams, "best_" + metric + "_dir"), hparams)
+  utils.save_hparams(out_dir, hparams)
+  for metric in hparams.metrics:
+    utils.save_hparams(getattr(hparams, "best_" + metric + "_dir"), hparams)
 
   # Print HParams
   utils.print_hparams(hparams)
@@ -546,60 +464,26 @@ def run_main(flags, default_hparams, train_fn, inference_fn, target_session=""):
   num_workers = flags.num_workers
   utils.print_out("# Job id %d" % jobid)
 
-  # Random
-  random_seed = flags.random_seed
-  if random_seed is not None and random_seed > 0:
-    utils.print_out("# Set random seed to %d" % random_seed)
-    random.seed(random_seed + jobid)
-    np.random.seed(random_seed + jobid)
-
   ## Train / Decode
   out_dir = flags.out_dir
-  if not tf.gfile.Exists(out_dir): tf.gfile.MakeDirs(out_dir)
 
   # Load hparams.
   hparams = create_or_load_hparams(
-      out_dir, default_hparams, flags.hparams_path, save_hparams=(jobid == 0))
+      out_dir, default_hparams, flags.hparams_path)
 
-  if flags.inference_input_file:
-    # Inference indices
-    hparams.inference_indices = None
-    if flags.inference_list:
-      (hparams.inference_indices) = (
-          [int(token)  for token in flags.inference_list.split(",")])
-
-    # Inference
-    trans_file = flags.inference_output_file
-    ckpt = flags.ckpt
-    if not ckpt:
-      ckpt = tf.train.latest_checkpoint(out_dir)
-    inference_fn(ckpt, flags.inference_input_file,
-                 trans_file, hparams, num_workers, jobid)
-
-    # Evaluation
-    ref_file = flags.inference_ref_file
-    if ref_file and tf.gfile.Exists(trans_file):
-      for metric in hparams.metrics:
-        score = evaluation_utils.evaluate(
-            ref_file,
-            trans_file,
-            metric,
-            hparams.subword_option)
-        utils.print_out("  %s: %.1f" % (metric, score))
-  else:
-    # Train
-    train_fn(hparams, target_session=target_session)
+  train_fn(hparams, target_session=target_session)
 
 
 def main(unused_argv):
-  default_hparams = create_hparams(FLAGS)
+  default_hparams = create_hparams()
   train_fn = train.train
   inference_fn = inference.inference
   run_main(FLAGS, default_hparams, train_fn, inference_fn)
 
 
 if __name__ == "__main__":
+  print("Start running!")
   nmt_parser = argparse.ArgumentParser()
   add_arguments(nmt_parser)
   FLAGS, unparsed = nmt_parser.parse_known_args()
-  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+  tf.app.run(main=main)
