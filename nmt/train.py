@@ -22,8 +22,6 @@ import time
 
 import tensorflow as tf
 
-from . import attention_model
-from . import gnmt_model
 from . import inference
 from . import model as nmt_model
 from . import model_helper
@@ -436,10 +434,6 @@ def _sample_decode(model, global_step, sess, hparams, iterator, src_data,
   sess.run(iterator.initializer, feed_dict=iterator_feed_dict)
 
   nmt_outputs, attention_summary = model.decode(sess)
-
-  if hparams.beam_width > 0:
-    # get the top translation.
-    nmt_outputs = nmt_outputs[0]
 
   translation = nmt_utils.get_translation(
       nmt_outputs,
