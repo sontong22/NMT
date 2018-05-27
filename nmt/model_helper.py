@@ -93,7 +93,6 @@ def create_train_model(
     # Note: One can set model_device_fn to
     # `tf.train.replica_device_setter(ps_tasks)` for distributed training.
     model_device_fn = None
-    if extra_args: model_device_fn = extra_args.model_device_fn
     with tf.device(model_device_fn):
       model = model_creator(
           hparams,
