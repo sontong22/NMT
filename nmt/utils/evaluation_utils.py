@@ -15,14 +15,10 @@
 
 """Utility for evaluating various tasks, e.g., translation & summarization."""
 import codecs
-import os
-import re
-import subprocess
 
 import tensorflow as tf
 
 from ..scripts import bleu
-from ..scripts import rougecd 
 
 
 __all__ = ["evaluate"]
