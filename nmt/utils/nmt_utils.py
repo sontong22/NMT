@@ -54,8 +54,8 @@ def decode_and_evaluate(name,
       while True:
         try:
           nmt_outputs, _ = model.decode(sess)
-          if beam_width == 0:
-            nmt_outputs = np.expand_dims(nmt_outputs, 0)
+          #beam_width == 0
+          nmt_outputs = np.expand_dims(nmt_outputs, 0)
 
           batch_size = nmt_outputs.shape[1]
           num_sentences += batch_size
@@ -99,11 +99,7 @@ def get_translation(nmt_outputs, sent_id, tgt_eos, subword_option):
   if tgt_eos and tgt_eos in output:
     output = output[:output.index(tgt_eos)]
 
-  if subword_option == "bpe":  # BPE
-    translation = utils.format_bpe_text(output)
-  elif subword_option == "spm":  # SPM
-    translation = utils.format_spm_text(output)
-  else:
-    translation = utils.format_text(output)
+  # subword_option = " "
+  translation = utils.format_text(output)
 
   return translation

@@ -30,24 +30,15 @@ VOCAB_SIZE_THRESHOLD_CPU = 50000
 
 def get_initializer(init_op, seed=None, init_weight=None):
   """Create an initializer. init_weight is only for uniform."""
-  if init_op == "uniform":
-    assert init_weight
-    return tf.random_uniform_initializer(
+
+  assert init_weight
+  return tf.random_uniform_initializer(
         -init_weight, init_weight, seed=seed)
-  elif init_op == "glorot_normal":
-    return tf.keras.initializers.glorot_normal(
-        seed=seed)
-  elif init_op == "glorot_uniform":
-    return tf.keras.initializers.glorot_uniform(
-        seed=seed)
-  else:
-    raise ValueError("Unknown init_op %s" % init_op)
 
 
 def get_device_str(device_id, num_gpus):
   """Return a device string for multi-GPU setup."""
-  if num_gpus == 0:
-    return "/cpu:0"
+
   device_str_output = "/gpu:%d" % (device_id % num_gpus)
   return device_str_output
 
@@ -304,45 +295,19 @@ def create_emb_for_encoder_and_decoder(share_vocab,
       size.
   """
 
-  if num_partitions <= 1:
-    partitioner = None
-  else:
-    # Note: num_partitions > 1 is required for distributed training due to
-    # embedding_lookup tries to colocate single partition-ed embedding variable
-    # with lookup ops. This may cause embedding variables being placed on worker
-    # jobs.
-    partitioner = tf.fixed_size_partitioner(num_partitions)
+  partitioner = None
 
-  if (src_embed_file or tgt_embed_file) and partitioner:
-    raise ValueError(
-        "Can't set num_partitions > 1 when using pretrained embedding")
 
   with tf.variable_scope(
-      scope or "embeddings", dtype=dtype, partitioner=partitioner) as scope:
-    # Share embedding
-    if share_vocab:
-      if src_vocab_size != tgt_vocab_size:
-        raise ValueError("Share embedding but different src/tgt vocab sizes"
-                         " %d vs. %d" % (src_vocab_size, tgt_vocab_size))
-      assert src_embed_size == tgt_embed_size
-      utils.print_out("# Use the same embedding for source and target")
-      vocab_file = src_vocab_file or tgt_vocab_file
-      embed_file = src_embed_file or tgt_embed_file
+    scope or "embeddings", dtype=dtype, partitioner=partitioner) as scope:
 
-      embedding_encoder = _create_or_load_embed(
-          "embedding_share", vocab_file, embed_file,
-          src_vocab_size, src_embed_size, dtype)
-      embedding_decoder = embedding_encoder
-    else:
-      with tf.variable_scope("encoder", partitioner=partitioner):
-        embedding_encoder = _create_or_load_embed(
-            "embedding_encoder", src_vocab_file, src_embed_file,
-            src_vocab_size, src_embed_size, dtype)
+    with tf.variable_scope("encoder", partitioner=partitioner):
+        embedding_encoder = _create_or_load_embed("embedding_encoder", src_vocab_file, src_embed_file,
+                                              src_vocab_size, src_embed_size, dtype)
 
-      with tf.variable_scope("decoder", partitioner=partitioner):
-        embedding_decoder = _create_or_load_embed(
-            "embedding_decoder", tgt_vocab_file, tgt_embed_file,
-            tgt_vocab_size, tgt_embed_size, dtype)
+    with tf.variable_scope("decoder", partitioner=partitioner):
+        embedding_decoder = _create_or_load_embed("embedding_decoder", tgt_vocab_file, tgt_embed_file,
+                                                  tgt_vocab_size, tgt_embed_size, dtype)
 
   return embedding_encoder, embedding_decoder
 
@@ -353,46 +318,14 @@ def _single_cell(unit_type, num_units, forget_bias, dropout, mode,
   # dropout (= 1 - keep_prob) is set to 0 during eval and infer
   dropout = dropout if mode == tf.contrib.learn.ModeKeys.TRAIN else 0.0
 
-  # Cell Type
-  if unit_type == "lstm":
-    utils.print_out("  LSTM, forget_bias=%g" % forget_bias, new_line=False)
-    single_cell = tf.contrib.rnn.BasicLSTMCell(
-        num_units,
-        forget_bias=forget_bias)
-  elif unit_type == "gru":
-    utils.print_out("  GRU", new_line=False)
-    single_cell = tf.contrib.rnn.GRUCell(num_units)
-  elif unit_type == "layer_norm_lstm":
-    utils.print_out("  Layer Normalized LSTM, forget_bias=%g" % forget_bias,
-                    new_line=False)
-    single_cell = tf.contrib.rnn.LayerNormBasicLSTMCell(
-        num_units,
-        forget_bias=forget_bias,
-        layer_norm=True)
-  elif unit_type == "nas":
-    utils.print_out("  NASCell", new_line=False)
-    single_cell = tf.contrib.rnn.NASCell(num_units)
-  else:
-    raise ValueError("Unknown unit type %s!" % unit_type)
+  # Cell Type (=lstm)
+  utils.print_out("  LSTM, forget_bias=%g" % forget_bias, new_line=False)
+  single_cell = tf.contrib.rnn.BasicLSTMCell(num_units,forget_bias=forget_bias)
+
 
   # Dropout (= 1 - keep_prob)
-  if dropout > 0.0:
-    single_cell = tf.contrib.rnn.DropoutWrapper(
-        cell=single_cell, input_keep_prob=(1.0 - dropout))
-    utils.print_out("  %s, dropout=%g " %(type(single_cell).__name__, dropout),
-                    new_line=False)
-
-  # Residual
-  if residual_connection:
-    single_cell = tf.contrib.rnn.ResidualWrapper(
-        single_cell, residual_fn=residual_fn)
-    utils.print_out("  %s" % type(single_cell).__name__, new_line=False)
-
-  # Device Wrapper
-  if device_str:
-    single_cell = tf.contrib.rnn.DeviceWrapper(single_cell, device_str)
-    utils.print_out("  %s, device=%s" %
-                    (type(single_cell).__name__, device_str), new_line=False)
+  single_cell = tf.contrib.rnn.DropoutWrapper(cell=single_cell, input_keep_prob=(1.0 - dropout))
+  utils.print_out("  %s, dropout=%g " %(type(single_cell).__name__, dropout),new_line=False)
 
   return single_cell
 

@@ -138,11 +138,8 @@ class BaseModel(object):
       self.learning_rate = self._get_learning_rate_decay(hparams)
 
       # Optimizer
-      if hparams.optimizer == "sgd":
-        opt = tf.train.GradientDescentOptimizer(self.learning_rate)
-        tf.summary.scalar("lr", self.learning_rate)
-      elif hparams.optimizer == "adam":
-        opt = tf.train.AdamOptimizer(self.learning_rate)
+      opt = tf.train.GradientDescentOptimizer(self.learning_rate)
+      tf.summary.scalar("lr", self.learning_rate)
 
       # Gradients
       gradients = tf.gradients(
@@ -187,13 +184,10 @@ class BaseModel(object):
     # Inspired by https://arxiv.org/pdf/1706.03762.pdf (Section 5.3)
     # When step < warmup_steps,
     #   learing_rate *= warmup_factor ** (warmup_steps - step)
-    if warmup_scheme == "t2t":
+
       # 0.01^(1/warmup_steps): we start with a lr, 100 times smaller
-      warmup_factor = tf.exp(tf.log(0.01) / warmup_steps)
-      inv_decay = warmup_factor**(
-          tf.to_float(warmup_steps - self.global_step))
-    else:
-      raise ValueError("Unknown warmup scheme %s" % warmup_scheme)
+    warmup_factor = tf.exp(tf.log(0.01) / warmup_steps)
+    inv_decay = warmup_factor**(tf.to_float(warmup_steps - self.global_step))
 
     return tf.cond(
         self.global_step < hparams.warmup_steps,
@@ -203,30 +197,12 @@ class BaseModel(object):
 
   def _get_learning_rate_decay(self, hparams):
     """Get learning rate decay."""
-    if hparams.decay_scheme in ["luong5", "luong10", "luong234"]:
-      decay_factor = 0.5
-      if hparams.decay_scheme == "luong5":
-        start_decay_step = int(hparams.num_train_steps / 2)
-        decay_times = 5
-      elif hparams.decay_scheme == "luong10":
-        start_decay_step = int(hparams.num_train_steps / 2)
-        decay_times = 10
-      elif hparams.decay_scheme == "luong234":
-        start_decay_step = int(hparams.num_train_steps * 2 / 3)
-        decay_times = 4
-      remain_steps = hparams.num_train_steps - start_decay_step
-      decay_steps = int(remain_steps / decay_times)
-    elif not hparams.decay_scheme:  # no decay
-      start_decay_step = hparams.num_train_steps
-      decay_steps = 0
-      decay_factor = 1.0
-    elif hparams.decay_scheme:
-      raise ValueError("Unknown decay scheme %s" % hparams.decay_scheme)
-    utils.print_out("  decay_scheme=%s, start_decay_step=%d, decay_steps %d, "
-                    "decay_factor %g" % (hparams.decay_scheme,
-                                         start_decay_step,
-                                         decay_steps,
-                                         decay_factor))
+
+    # no decay
+    start_decay_step = hparams.num_train_steps
+    decay_steps = 0
+    decay_factor = 1.0
+
 
     return tf.cond(
         self.global_step < start_decay_step,
@@ -344,15 +320,12 @@ class BaseModel(object):
 
   def _get_infer_maximum_iterations(self, hparams, source_sequence_length):
     """Maximum decoding steps at inference time."""
-    if hparams.tgt_max_len_infer:
-      maximum_iterations = hparams.tgt_max_len_infer
-      utils.print_out("  decoding maximum_iterations %d" % maximum_iterations)
-    else:
-      # TODO(thangluong): add decoding_length_factor flag
-      decoding_length_factor = 2.0
-      max_encoder_length = tf.reduce_max(source_sequence_length)
-      maximum_iterations = tf.to_int32(tf.round(
-          tf.to_float(max_encoder_length) * decoding_length_factor))
+
+    # TODO(thangluong): add decoding_length_factor flag
+    decoding_length_factor = 2.0
+    max_encoder_length = tf.reduce_max(source_sequence_length)
+    maximum_iterations = tf.to_int32(tf.round(tf.to_float(max_encoder_length) * decoding_length_factor))
+
     return maximum_iterations
 
   def _build_decoder(self, encoder_outputs, encoder_state, hparams):
@@ -387,8 +360,8 @@ class BaseModel(object):
       if self.mode != tf.contrib.learn.ModeKeys.INFER:
         # decoder_emp_inp: [max_time, batch_size, num_units]
         target_input = iterator.target_input
-        if self.time_major:
-          target_input = tf.transpose(target_input)
+
+        target_input = tf.transpose(target_input)
         decoder_emb_inp = tf.nn.embedding_lookup(
             self.embedding_decoder, target_input)
 
@@ -427,35 +400,14 @@ class BaseModel(object):
         start_tokens = tf.fill([self.batch_size], tgt_sos_id)
         end_token = tgt_eos_id
 
-        if beam_width > 0:
-          my_decoder = tf.contrib.seq2seq.BeamSearchDecoder(
-              cell=cell,
-              embedding=self.embedding_decoder,
-              start_tokens=start_tokens,
-              end_token=end_token,
-              initial_state=decoder_initial_state,
-              beam_width=beam_width,
-              output_layer=self.output_layer,
-              length_penalty_weight=length_penalty_weight)
-        else:
-          # Helper
-          sampling_temperature = hparams.sampling_temperature
-          if sampling_temperature > 0.0:
-            helper = tf.contrib.seq2seq.SampleEmbeddingHelper(
-                self.embedding_decoder, start_tokens, end_token,
-                softmax_temperature=sampling_temperature,
-                seed=hparams.random_seed)
-          else:
-            helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(
-                self.embedding_decoder, start_tokens, end_token)
+        # Helper
+        helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(self.embedding_decoder, start_tokens, end_token)
 
-          # Decoder
-          my_decoder = tf.contrib.seq2seq.BasicDecoder(
-              cell,
-              helper,
-              decoder_initial_state,
-              output_layer=self.output_layer  # applied per timestep
-          )
+        # Decoder
+        my_decoder = tf.contrib.seq2seq.BasicDecoder(cell,
+                                                     helper,
+                                                     decoder_initial_state,
+                                                     output_layer=self.output_layer)  # applied per timestep
 
         # Dynamic decoding
         outputs, final_context_state, _ = tf.contrib.seq2seq.dynamic_decode(
@@ -465,12 +417,8 @@ class BaseModel(object):
             swap_memory=True,
             scope=decoder_scope)
 
-        if beam_width > 0:
-          logits = tf.no_op()
-          sample_id = outputs.predicted_ids
-        else:
-          logits = outputs.rnn_output
-          sample_id = outputs.sample_id
+        logits = outputs.rnn_output
+        sample_id = outputs.sample_id
 
     return logits, sample_id, final_context_state
 
@@ -498,15 +446,13 @@ class BaseModel(object):
   def _compute_loss(self, logits):
     """Compute optimization loss."""
     target_output = self.iterator.target_output
-    if self.time_major:
-      target_output = tf.transpose(target_output)
+    target_output = tf.transpose(target_output)
     max_time = self.get_max_time(target_output)
     crossent = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=target_output, logits=logits)
     target_weights = tf.sequence_mask(
         self.iterator.target_sequence_length, max_time, dtype=logits.dtype)
-    if self.time_major:
-      target_weights = tf.transpose(target_weights)
+    target_weights = tf.transpose(target_weights)
 
     loss = tf.reduce_sum(
         crossent * target_weights) / tf.to_float(self.batch_size)
@@ -535,11 +481,8 @@ class BaseModel(object):
 
     # make sure outputs is of shape [batch_size, time] or [beam_width,
     # batch_size, time] when using beam search.
-    if self.time_major:
-      sample_words = sample_words.transpose()
-    elif sample_words.ndim == 3:  # beam search output in [batch_size,
-                                  # time, beam_width] shape.
-      sample_words = sample_words.transpose([2, 0, 1])
+    sample_words = sample_words.transpose()
+
     return sample_words, infer_summary
 
 
@@ -556,9 +499,7 @@ class Model(BaseModel):
     num_residual_layers = self.num_encoder_residual_layers
     iterator = self.iterator
 
-    source = iterator.source
-    if self.time_major:
-      source = tf.transpose(source)
+    source = tf.transpose(iterator.source)
 
     with tf.variable_scope("encoder") as scope:
       dtype = scope.dtype
@@ -567,45 +508,14 @@ class Model(BaseModel):
           self.embedding_encoder, source)
 
       # Encoder_outputs: [max_time, batch_size, num_units]
-      if hparams.encoder_type == "uni":
-        utils.print_out("  num_layers = %d, num_residual_layers=%d" %
-                        (num_layers, num_residual_layers))
-        cell = self._build_encoder_cell(
-            hparams, num_layers, num_residual_layers)
-
-        encoder_outputs, encoder_state = tf.nn.dynamic_rnn(
-            cell,
-            encoder_emb_inp,
-            dtype=dtype,
-            sequence_length=iterator.source_sequence_length,
-            time_major=self.time_major,
-            swap_memory=True)
-      elif hparams.encoder_type == "bi":
-        num_bi_layers = int(num_layers / 2)
-        num_bi_residual_layers = int(num_residual_layers / 2)
-        utils.print_out("  num_bi_layers = %d, num_bi_residual_layers=%d" %
-                        (num_bi_layers, num_bi_residual_layers))
-
-        encoder_outputs, bi_encoder_state = (
-            self._build_bidirectional_rnn(
-                inputs=encoder_emb_inp,
-                sequence_length=iterator.source_sequence_length,
-                dtype=dtype,
-                hparams=hparams,
-                num_bi_layers=num_bi_layers,
-                num_bi_residual_layers=num_bi_residual_layers))
-
-        if num_bi_layers == 1:
-          encoder_state = bi_encoder_state
-        else:
-          # alternatively concat forward and backward states
-          encoder_state = []
-          for layer_id in range(num_bi_layers):
-            encoder_state.append(bi_encoder_state[0][layer_id])  # forward
-            encoder_state.append(bi_encoder_state[1][layer_id])  # backward
-          encoder_state = tuple(encoder_state)
-      else:
-        raise ValueError("Unknown encoder_type %s" % hparams.encoder_type)
+      utils.print_out("  num_layers = %d, num_residual_layers=%d" % (num_layers, num_residual_layers))
+      cell = self._build_encoder_cell(hparams, num_layers, num_residual_layers)
+      encoder_outputs, encoder_state = tf.nn.dynamic_rnn(cell,
+                                                         encoder_emb_inp,
+                                                         dtype=dtype,
+                                                         sequence_length=iterator.source_sequence_length,
+                                                         time_major=self.time_major,
+                                                         swap_memory=True)
     return encoder_outputs, encoder_state
 
   def _build_bidirectional_rnn(self, inputs, sequence_length,
@@ -653,8 +563,6 @@ class Model(BaseModel):
                           source_sequence_length):
     """Build an RNN cell that can be used by decoder."""
     # We only make use of encoder_outputs in attention-based models
-    if hparams.attention:
-      raise ValueError("BasicModel doesn't support attention.")
 
     cell = model_helper.create_rnn_cell(
         unit_type=hparams.unit_type,
@@ -667,11 +575,6 @@ class Model(BaseModel):
         mode=self.mode,
         single_cell_fn=self.single_cell_fn)
 
-    # For beam search, we need to replicate encoder infos beam_width times
-    if self.mode == tf.contrib.learn.ModeKeys.INFER and hparams.beam_width > 0:
-      decoder_initial_state = tf.contrib.seq2seq.tile_batch(
-          encoder_state, multiplier=hparams.beam_width)
-    else:
-      decoder_initial_state = encoder_state
+    decoder_initial_state = encoder_state
 
     return cell, decoder_initial_state

@@ -69,8 +69,6 @@ def check_vocab(vocab_file, out_dir, check_special_token=True, sos=None,
           for word in vocab:
             f.write("%s\n" % word)
         vocab_file = new_vocab_file
-  else:
-    raise ValueError("vocab_file '%s' does not exist." % vocab_file)
 
   vocab_size = len(vocab)
   return vocab_size, vocab_file
@@ -80,11 +78,9 @@ def create_vocab_tables(src_vocab_file, tgt_vocab_file, share_vocab):
   """Creates vocab tables for src_vocab_file and tgt_vocab_file."""
   src_vocab_table = lookup_ops.index_table_from_file(
       src_vocab_file, default_value=UNK_ID)
-  if share_vocab:
-    tgt_vocab_table = src_vocab_table
-  else:
-    tgt_vocab_table = lookup_ops.index_table_from_file(
-        tgt_vocab_file, default_value=UNK_ID)
+
+  tgt_vocab_table = lookup_ops.index_table_from_file(
+      tgt_vocab_file, default_value=UNK_ID)
   return src_vocab_table, tgt_vocab_table
 
 
@@ -111,8 +107,6 @@ def load_embed_txt(embed_file):
       word = tokens[0]
       vec = list(map(float, tokens[1:]))
       emb_dict[word] = vec
-      if emb_size:
-        assert emb_size == len(vec), "All embedding size should be same."
-      else:
-        emb_size = len(vec)
+
+      emb_size = len(vec)
   return emb_dict, emb_size
