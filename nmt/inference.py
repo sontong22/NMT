@@ -29,8 +29,6 @@ from .utils import nmt_utils
 __all__ = ["load_data"]
 
 
-
-
 def load_data(inference_input_file, hparams=None):
   """Load inference data."""
   with codecs.getreader("utf-8")(
