@@ -21,6 +21,7 @@ import tensorflow as tf
 from ..scripts import bleu
 
 
+
 __all__ = ["evaluate"]
 
 def evaluate(ref_file, trans_file, metric, subword_option=None):
