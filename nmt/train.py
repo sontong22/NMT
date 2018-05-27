@@ -252,12 +252,16 @@ def train(hparams, scope=None, target_session=""):
   utils.print_out("# log_file=%s" % log_file, log_f)
 
   # TensorFlow model
+  config_proto = utils.get_config_proto(
+  log_device_placement = log_device_placement,
+  num_intra_threads = hparams.num_intra_threads,
+  num_inter_threads = hparams.num_inter_threads)
   train_sess = tf.Session(
-      target=target_session, graph=train_model.graph)
+      target=target_session, config=config_proto, graph=train_model.graph)
   eval_sess = tf.Session(
-      target=target_session, graph=eval_model.graph)
+      target=target_session, config=config_proto, graph=eval_model.graph)
   infer_sess = tf.Session(
-      target=target_session, graph=infer_model.graph)
+      target=target_session, config=config_proto, graph=infer_model.graph)
 
   with train_model.graph.as_default():
     loaded_train_model, global_step = model_helper.create_or_load_model(
