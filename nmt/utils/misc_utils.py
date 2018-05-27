@@ -81,35 +81,6 @@ def print_hparams(hparams, skip_patterns=None, header=None):
       print_out("  %s=%s" % (key, str(values[key])))
 
 
-# def load_hparams(model_dir):
-#   """Load hparams from an existing model directory."""
-#   hparams_file = os.path.join(model_dir, "hparams")
-#   if tf.gfile.Exists(hparams_file):
-#     print_out("# Loading hparams from %s" % hparams_file)
-#     with codecs.getreader("utf-8")(tf.gfile.GFile(hparams_file, "rb")) as f:
-#       try:
-#         hparams_values = json.load(f)
-#         hparams = tf.contrib.training.HParams(**hparams_values)
-#       except ValueError:
-#         print_out("  can't load hparams file")
-#         return None
-#     return hparams
-#   else:
-#     return None
-
-
-# def maybe_parse_standard_hparams(hparams, hparams_path):
-#   """Override hparams values with existing standard hparams config."""
-#   if not hparams_path:
-#     return hparams
-#
-#   if tf.gfile.Exists(hparams_path):
-#     print_out("# Loading standard hparams from %s" % hparams_path)
-#     with tf.gfile.GFile(hparams_path, "r") as f:
-#       hparams.parse_json(f.read())
-#
-#   return hparams
-
 
 def save_hparams(out_dir, hparams):
   """Save hparams."""
@@ -160,24 +131,3 @@ def format_text(words):
   return b" ".join(words)
 
 
-# def format_bpe_text(symbols, delimiter=b"@@"):
-#   """Convert a sequence of bpe words into sentence."""
-#   words = []
-#   word = b""
-#   if isinstance(symbols, str):
-#     symbols = symbols.encode()
-#   delimiter_len = len(delimiter)
-#   for symbol in symbols:
-#     if len(symbol) >= delimiter_len and symbol[-delimiter_len:] == delimiter:
-#       word += symbol[:-delimiter_len]
-#     else:  # end of a word
-#       word += symbol
-#       words.append(word)
-#       word = b""
-#   return b" ".join(words)
-
-
-# def format_spm_text(symbols):
-#   """Decode a text in SPM (https://github.com/google/sentencepiece) format."""
-#   return u"".join(format_text(symbols).decode("utf-8").split()).replace(
-#       u"\u2581", u" ").strip().encode("utf-8")

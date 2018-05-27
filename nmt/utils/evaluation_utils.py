@@ -22,7 +22,7 @@ import subprocess
 import tensorflow as tf
 
 from ..scripts import bleu
-from ..scripts import rougecd 
+
 
 
 __all__ = ["evaluate"]
